@@ -12,7 +12,6 @@ Personal shell config. Assumes Homebrew on macOS.
 - [starship](https://starship.rs) — prompt
 - [zsh-autosuggestions](https://github.com/zsh-users/zsh-autosuggestions)
 - [zsh-syntax-highlighting](https://github.com/zsh-users/zsh-syntax-highlighting)
-- [Google Cloud SDK](https://cloud.google.com/sdk)
 
 ## Install
 

@@ -24,6 +24,13 @@ alias cd="z"
 alias fs=yazi
 alias c="claude --dangerously-skip-permissions --chrome"
 
+# ── Keychain secrets (see references/macos-keychain-secrets.md) ──
+# Secrets are stored in the macOS Keychain and loaded in ~/.zshenv.
+# These helpers manage them. store-secret NAME "value" / get-secret NAME / delete-secret NAME
+store-secret()  { security add-generic-password -s "$1" -a "$USER" -w "$2" -T "" 2>/dev/null && echo "✅ Saved $1 to Keychain"; }
+get-secret()    { security find-generic-password -s "$1" -w 2>/dev/null; }
+delete-secret() { security delete-generic-password -s "$1" 2>/dev/null && echo "🗑️  Deleted $1 from Keychain"; }
+
 # ── SSH: drop into Documents when connecting remotely ──
 [[ -n "$SSH_CONNECTION" && "$PWD" == "$HOME" ]] && cd ~/Documents
 

@@ -17,22 +17,30 @@ Repeat for any other keys (`OPENAI_API_KEY`, `GITHUB_TOKEN`, …).
 
 ## 2. Load it in your shell
 
-Add to `~/.zshrc`:
+Load secrets in **`~/.zshenv`**, not `~/.zshrc`. `~/.zshenv` is sourced for
+*every* zsh invocation — login, interactive, and non-interactive/script shells —
+so the vars are also available to scripts, `ssh host <cmd>`, and cron. `~/.zshrc`
+only runs for interactive shells, so secrets loaded there are invisible to
+scripts.
+
+Map each env var to its Keychain service name and loop:
 
 ```bash
-# Load Linear API key from Keychain
-if [ -z "$LINEAR_API_KEY" ]; then
-    LINEAR_API_KEY="$(security find-generic-password -s LINEAR_API_KEY -w 2>/dev/null)"
-    if [ -n "$LINEAR_API_KEY" ]; then
-        export LINEAR_API_KEY
-        echo "✅ LINEAR_API_KEY loaded from Keychain" >&2
-    else
-        echo "⚠️  LINEAR_API_KEY not found in Keychain" >&2
-    fi
+if command -v security >/dev/null 2>&1; then
+  typeset -A keychain_secrets=(
+    EXAMPLE_API_KEY  example-api-key
+    EXAMPLE_TOKEN    example-service-token
+  )
+  for var svc in ${(kv)keychain_secrets}; do
+    val="$(security find-generic-password -s "$svc" -w 2>/dev/null)"
+    [ -n "$val" ] && export "$var=$val"
+  done
+  unset var svc val keychain_secrets
 fi
 ```
 
-Then `source ~/.zshrc` to reload.
+See [`configs/.zshenv`](../configs/.zshenv) for the working template. After
+editing, `source ~/.zshenv` (or open a new shell) to reload.
 
 ## Helper functions (recommended)
 

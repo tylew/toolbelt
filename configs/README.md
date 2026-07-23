@@ -17,4 +17,13 @@ Personal shell config. Assumes Homebrew on macOS.
 
 ```sh
 cp .zshrc ~/.zshrc
+cp .zshenv ~/.zshenv
 ```
+
+## Secrets
+
+`.zshenv` loads secrets from the macOS Keychain at shell startup (works for
+scripts and non-interactive shells, not just terminals). `.zshrc` provides
+`store-secret` / `get-secret` / `delete-secret` helpers to manage them. Edit the
+`keychain_secrets` map in `.zshenv` to list your own vars. See
+[`references/macos-keychain-secrets.md`](../references/macos-keychain-secrets.md).

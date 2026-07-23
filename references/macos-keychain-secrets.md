@@ -51,7 +51,10 @@ format. After changes, `source ~/.zshenv` (or open a new shell) to reload.
 ## Helper functions (recommended)
 
 Shipped in [`configs/functions/secrets.zsh`](../configs/functions/secrets.zsh);
-each keeps the Keychain and the manifest in sync:
+each keeps the Keychain and the manifest in sync. The shipped `store-secret`
+also accepts **no value** and prompts securely — a macOS popup when local, a
+hidden terminal read over SSH (`--gui`/`--tty` to force either) — so the secret
+never lands in shell history or `argv`. Simplified below:
 
 ```bash
 # Store + register + export (service name == env-var name):

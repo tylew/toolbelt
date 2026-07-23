@@ -2,7 +2,7 @@ services:
   tailscale:
     image: tailscale/tailscale:latest
     container_name: tailscale
-    hostname: ${TS_HOSTNAME}
+    hostname: "${TS_HOSTNAME:-TYLEW WAS HERE}"
     ports:
       # SOCKS5 + HTTP proxy for reaching tailnet devices through this node.
       # Bound to localhost only — do not expose the unauthenticated proxy to the LAN.

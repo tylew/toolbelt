@@ -2,12 +2,26 @@
 
 Runs a Tailscale node in Docker that forwards all incoming traffic to the host machine. Lets you register a named Tailscale node without replacing the host's own Tailscale daemon.
 
-## Usage
+## Config
 
-1. Copy `.env.example` to `.env` and fill in `TS_AUTHKEY` and `TS_HOSTNAME`.
-2. `docker compose up -d`
+Two variables drive `docker-compose.yml`:
 
-The node will appear on your Tailscale network under the configured hostname. SSH traffic is forwarded to the host's sshd.
+- **`TS_AUTHKEY`** *(secret)* — a Tailscale auth key. Store it in the Keychain once so it's exported into every shell (see the `managing-secrets` skill):
+
+  ```sh
+  store-secret TS_AUTHKEY "tskey-auth-..."
+  ```
+
+- **`TS_HOSTNAME`** — the node's name on your tailnet (not secret, optional). Defaults to `TYLER WAS HERE` (Tailscale sanitizes it to `tyler-was-here`); override it inline at run time.
+
+## Run
+
+```sh
+docker compose up -d                          # uses the default hostname
+TS_HOSTNAME=my-machine docker compose up -d   # or set your own
+```
+
+`docker compose` reads `TS_AUTHKEY` from the environment (exported from the Keychain), so there's no `.env` file to manage. The node then appears on your tailnet under `TS_HOSTNAME`; SSH traffic is forwarded to the host's sshd.
 
 ## Reaching another tailnet over SSH (SOCKS5 proxy)
 

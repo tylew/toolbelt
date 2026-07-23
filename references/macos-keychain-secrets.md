@@ -23,47 +23,60 @@ so the vars are also available to scripts, `ssh host <cmd>`, and cron. `~/.zshrc
 only runs for interactive shells, so secrets loaded there are invisible to
 scripts.
 
-Map each env var to its Keychain service name and loop:
+Rather than hardcode the list of secrets, keep a per-machine **manifest** of
+env-var names (one per line) and load each from the Keychain under a service of
+the same name:
 
 ```bash
-if command -v security >/dev/null 2>&1; then
-  typeset -A keychain_secrets=(
-    EXAMPLE_API_KEY  example-api-key
-    EXAMPLE_TOKEN    example-service-token
-  )
-  for var svc in ${(kv)keychain_secrets}; do
-    val="$(security find-generic-password -s "$svc" -w 2>/dev/null)"
-    [ -n "$val" ] && export "$var=$val"
-  done
-  unset var svc val keychain_secrets
+: ${TOOLBELT_SECRETS:=${XDG_CONFIG_HOME:-$HOME/.config}/toolbelt/secrets}
+if command -v security >/dev/null 2>&1 && [ -r "$TOOLBELT_SECRETS" ]; then
+  while IFS= read -r name; do
+    name="${name%%#*}"; name="${name//[[:space:]]/}"
+    [ -z "$name" ] && continue
+    val="$(security find-generic-password -s "$name" -w 2>/dev/null)"
+    [ -n "$val" ] && export "$name=$val"
+  done < "$TOOLBELT_SECRETS"
+  unset name val
 fi
 ```
 
-See [`configs/.zshenv`](../configs/.zshenv) for the working template. After
-editing, `source ~/.zshenv` (or open a new shell) to reload.
+Why a manifest? The list of *which* secrets a machine has is machine-specific,
+so it doesn't belong in committed config. The manifest lives outside the repo
+(`~/.config/toolbelt/secrets`), stays uncommitted, and is maintained by the
+helpers below — so adding a secret never means editing tracked files. See
+[`configs/toolbelt-env.zsh`](../configs/toolbelt-env.zsh) for the working
+template and [`configs/secrets.example`](../configs/secrets.example) for the
+format. After changes, `source ~/.zshenv` (or open a new shell) to reload.
 
 ## Helper functions (recommended)
 
-Add to `~/.zshrc` for easy management:
+Shipped in [`configs/functions/secrets.zsh`](../configs/functions/secrets.zsh);
+each keeps the Keychain and the manifest in sync:
 
 ```bash
-# Store a secret:  store-secret LINEAR_API_KEY "lin_api_12345..."
+# Store + register + export (service name == env-var name):
 store-secret() {
-    security add-generic-password -s "$1" -a "$USER" -w "$2" -T "" 2>/dev/null && \
-        echo "✅ Saved $1 to Keychain"
+    local name="$1" value="$2"
+    [[ -n "$name" && -n "$value" ]] || { echo "usage: store-secret NAME value" >&2; return 2; }
+    security add-generic-password -s "$name" -a "$USER" -w "$value" -U -T "" 2>/dev/null || return 1
+    mkdir -p "${TOOLBELT_SECRETS:h}"
+    grep -qxF "$name" "$TOOLBELT_SECRETS" 2>/dev/null || echo "$name" >> "$TOOLBELT_SECRETS"
+    export "$name=$value"
 }
 
-# Retrieve a secret:  get-secret LINEAR_API_KEY
-get-secret() {
-    security find-generic-password -s "$1" -w 2>/dev/null
-}
+# Retrieve:  get-secret LINEAR_API_KEY
+get-secret() { security find-generic-password -s "$1" -w 2>/dev/null; }
 
-# Delete a secret:  delete-secret LINEAR_API_KEY
+# Delete from Keychain + manifest:  delete-secret LINEAR_API_KEY
 delete-secret() {
-    security delete-generic-password -s "$1" 2>/dev/null && \
-        echo "🗑️  Deleted $1 from Keychain"
+    security delete-generic-password -s "$1" >/dev/null 2>&1
+    grep -vxF "$1" "$TOOLBELT_SECRETS" > "$TOOLBELT_SECRETS.tmp" 2>/dev/null && mv "$TOOLBELT_SECRETS.tmp" "$TOOLBELT_SECRETS"
+    unset "$1"
 }
 ```
+
+Usage: `store-secret LINEAR_API_KEY "lin_api_12345..."`, then it auto-loads in
+every future shell.
 
 ## One-liner for a single script
 

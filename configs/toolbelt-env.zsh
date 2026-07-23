@@ -7,6 +7,12 @@
 # Secrets are stored in the macOS Keychain, never in this file.
 # See references/macos-keychain-secrets.md for how to store/retrieve them.
 
+# Silence zoxide's doctor false positive. With `alias cd=z` (toolbelt.zsh),
+# zoxide's doctor warns in non-interactive shells (ssh <cmd>, scripts, agent
+# harnesses) where its chpwd hook isn't wired up — even though `zoxide init` is
+# already last in toolbelt.zsh. Setting this here (env, every shell) covers them.
+export _ZO_DOCTOR=0
+
 # ── Load secrets from the macOS Keychain ──
 # The list of secrets to load lives in a PER-MACHINE manifest, not in this repo:
 #   $TOOLBELT_SECRETS   (default ~/.config/toolbelt/secrets)

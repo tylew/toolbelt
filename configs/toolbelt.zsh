@@ -32,7 +32,7 @@ done
 unset _fn
 
 # ── SSH: drop into Documents when connecting remotely ──
-[[ -n "$SSH_CONNECTION" && "$PWD" == "$HOME" ]] && cd ~/Documents
+[[ -n "$SSH_CONNECTION" && "$PWD" == "$HOME" ]] && builtin cd ~/Documents
 
 # ── Tool init ──
 eval "$(starship init zsh)"

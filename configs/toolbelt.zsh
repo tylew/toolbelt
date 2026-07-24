@@ -20,8 +20,8 @@ alias ll="eza -la --icons --group-directories-first --git"
 alias lt="eza --tree --icons --level=2"
 alias cat="bat --paging=never"
 alias cd="z"
-alias fs=yazi
 alias c="claude --dangerously-skip-permissions --chrome"
+# fs → see functions/fs.zsh (a function, not an alias, so it can cd on quit)
 
 # ── Functions ──
 # Source every *.zsh in the sibling functions/ dir, resolved relative to THIS

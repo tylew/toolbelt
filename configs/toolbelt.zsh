@@ -12,7 +12,12 @@ setopt HIST_IGNORE_SPACE
 # ── Completions ──
 autoload -Uz compinit && compinit
 zstyle ':completion:*' menu select
-zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'   # case-insensitive both ways
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"     # color the completion menu
+
+# ── Keybinds ──
+bindkey "\e[1;3C" forward-word    # Option+Right → jump forward a word
+bindkey "\e[1;3D" backward-word   # Option+Left  → jump back a word
 
 # ── Aliases ──
 alias ls="eza --icons --group-directories-first"
@@ -38,6 +43,7 @@ unset _fn
 eval "$(starship init zsh)"
 eval "$(fzf --zsh)"
 eval "$(zoxide init zsh)"
+command -v fnm >/dev/null 2>&1 && eval "$(fnm env --use-on-cd --shell zsh)"  # Node version manager
 
 # ── Plugins (must be last) ──
 # Resolve Homebrew's prefix instead of hardcoding it — it's /opt/homebrew on a

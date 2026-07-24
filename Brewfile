@@ -13,6 +13,7 @@ brew "zsh-syntax-highlighting" # command syntax highlighting
 
 # ── CLI ──
 brew "gh"                     # GitHub CLI
+brew "fnm"                    # fast Node version manager
 
 # ── Apps ──
 cask "visual-studio-code"     # editor

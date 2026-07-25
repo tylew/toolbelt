@@ -1,6 +1,9 @@
 # ── Paths & Env ──
 export PATH="$HOME/.local/bin:$PATH"
 [ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env"   # uv/rust env, if present
+# Repo root, resolved from THIS file (%x) so it's correct wherever cloned. Used
+# by `tb` (functions/tb.zsh) to self-update.
+export TOOLBELT_DIR="${${(%):-%x}:A:h:h}"
 
 # ── History ──
 HISTSIZE=10000
@@ -44,6 +47,18 @@ eval "$(starship init zsh)"
 eval "$(fzf --zsh)"
 eval "$(zoxide init zsh)"
 command -v fnm >/dev/null 2>&1 && eval "$(fnm env --use-on-cd --shell zsh)"  # Node version manager
+
+# fzf: back it with fd (fast, gitignore-aware, includes hidden) and add previews
+# — Ctrl-T shows file contents (bat), Alt-C shows a dir tree (eza). Guarded on
+# fd so a machine without it falls back to fzf's built-in walker instead of
+# breaking with "fd: command not found".
+if command -v fd >/dev/null 2>&1; then
+  export FZF_DEFAULT_COMMAND='fd --hidden --strip-cwd-prefix --exclude .git'
+  export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+  export FZF_CTRL_T_OPTS="--preview 'bat --color=always --line-range :500 {}'"
+  export FZF_ALT_C_COMMAND='fd --type d --hidden --strip-cwd-prefix --exclude .git'
+  export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always --level=2 {}'"
+fi
 
 # ── Plugins (must be last) ──
 # Resolve Homebrew's prefix instead of hardcoding it — it's /opt/homebrew on a

@@ -1,3 +1,9 @@
 .DS_Store
 .env
 **/.env
+
+# Editor / backup cruft
+*.bak
+*.tmp
+*.swp
+*~

@@ -35,9 +35,18 @@ unset _fn
 [[ -n "$SSH_CONNECTION" && "$PWD" == "$HOME" ]] && cd ~/Documents
 
 # ── Tool init ──
+# Let fd feed fzf (respects .gitignore, includes dotfiles, skips .git).
+if command -v fd >/dev/null 2>&1; then
+  export FZF_DEFAULT_COMMAND='fd --type f --hidden --strip-cwd-prefix --exclude .git'
+  export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+  export FZF_ALT_C_COMMAND='fd --type d --hidden --strip-cwd-prefix --exclude .git'
+fi
+
 eval "$(starship init zsh)"
 eval "$(fzf --zsh)"
 eval "$(zoxide init zsh)"
+# atuin last of the history tools so it owns Ctrl-R and Up (over fzf's binding).
+command -v atuin >/dev/null 2>&1 && eval "$(atuin init zsh)"
 
 # ── Plugins (must be last) ──
 # Resolve Homebrew's prefix instead of hardcoding it — it's /opt/homebrew on a

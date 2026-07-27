@@ -58,6 +58,17 @@ erasing anything). The block sources these files straight from the repo, so
 edits here take effect immediately. Re-running is idempotent. To uninstall,
 delete the lines between the `# >>> tylew/toolbelt >>>` / `# <<< tylew/toolbelt <<<` markers.
 
+With no arguments it installs everything. To install only some parts, pass
+component flags (`./install.sh --help` for the full list):
+
+```sh
+../install.sh --iterm         # just the iTerm2 config
+../install.sh --shell --deps  # shell config + Homebrew deps
+```
+
+Components: `--deps` (Homebrew + Brewfile), `--shell` (zsh hooks), `--iterm`
+(iTerm2 prefs), `--skills` (`~/.claude/skills` symlinks), `--all` (default).
+
 ## Secrets
 
 Secret *values* live in the macOS Keychain (never in this repo). The *list* of

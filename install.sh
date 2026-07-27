@@ -29,6 +29,7 @@ install only those parts:
   --deps      Homebrew (if missing) + Brewfile packages/casks
   --shell     hook the zsh config into ~/.zshrc and ~/.zshenv
   --iterm     copy iTerm2 preferences into ~/Library/Preferences
+  --tmux      symlink tmux.conf into ~/.config/tmux
   --skills    symlink skills into ~/.claude/skills
   --all       everything (the default)
   -h, --help  show this help
@@ -41,17 +42,18 @@ EOF
 }
 
 # ── Parse args: enable selected components (default = all) ──
-do_deps=false do_shell=false do_iterm=false do_skills=false
+do_deps=false do_shell=false do_iterm=false do_tmux=false do_skills=false
 if [ "$#" -eq 0 ]; then
-  do_deps=true do_shell=true do_iterm=true do_skills=true
+  do_deps=true do_shell=true do_iterm=true do_tmux=true do_skills=true
 else
   for arg in "$@"; do
     case "$arg" in
       --deps)   do_deps=true ;;
       --shell)  do_shell=true ;;
       --iterm)  do_iterm=true ;;
+      --tmux)   do_tmux=true ;;
       --skills) do_skills=true ;;
-      --all)    do_deps=true do_shell=true do_iterm=true do_skills=true ;;
+      --all)    do_deps=true do_shell=true do_iterm=true do_tmux=true do_skills=true ;;
       -h|--help) usage; exit 0 ;;
       *) printf 'Unknown option: %s\n\n' "$arg" >&2; usage >&2; exit 2 ;;
     esac
@@ -120,6 +122,26 @@ install_iterm() {
   defaults read com.googlecode.iterm2 >/dev/null 2>&1 || true  # nudge cfprefsd to reload
 }
 
+# ── tmux: symlink the repo's tmux.conf into ~/.config/tmux ──
+# Symlinked (not copied) so repo edits apply on the next reload. An existing
+# real file is backed up to .bak once.
+install_tmux() {
+  local src="$CONFIGS/tmux.conf"
+  [ -f "$src" ] || { info "skip  no tmux.conf in repo"; return; }
+  local dest="$HOME/.config/tmux/tmux.conf"
+  mkdir -p "$(dirname "$dest")"
+  if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$src" ]; then
+    info "ok    tmux.conf already linked"
+    return
+  fi
+  if [ -e "$dest" ] || [ -L "$dest" ]; then
+    mv "$dest" "$dest.bak"
+    info "backup $dest -> $dest.bak"
+  fi
+  ln -s "$src" "$dest"
+  info "tmux.conf -> $dest"
+}
+
 # ── Skills: symlink each skills/<name>/ into ~/.claude/skills ──
 # Edits in the repo then take effect immediately. An existing real (non-symlink)
 # skill dir of the same name is backed up first.
@@ -147,6 +169,7 @@ install_skills() {
 $do_deps   && install_deps
 $do_shell  && install_shell
 $do_iterm  && install_iterm
+$do_tmux   && install_tmux
 $do_skills && install_skills
 
 info "Done. Open a new shell (or run: exec zsh)."

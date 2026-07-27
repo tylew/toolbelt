@@ -59,6 +59,23 @@ brew bundle --file="$REPO/Brewfile"
 hook "$HOME/.zshenv" "$CONFIGS/toolbelt-env.zsh"   # every shell (secrets)
 hook "$HOME/.zshrc"  "$CONFIGS/toolbelt.zsh"       # interactive shells
 
+# ── Install iTerm2 preferences ──
+# Copy the repo's plist into the standard prefs location; iTerm2 reads it there
+# on launch. One-way (repo -> machine): re-export into the repo to capture GUI
+# changes. Existing prefs are backed up once. Quit iTerm2 first so it doesn't
+# overwrite the file on exit.
+ITERM_PLIST="$CONFIGS/iterm2/com.googlecode.iterm2.plist"
+ITERM_DEST="$HOME/Library/Preferences/com.googlecode.iterm2.plist"
+if [ -f "$ITERM_PLIST" ]; then
+  if [ -f "$ITERM_DEST" ] && [ ! -f "$ITERM_DEST.bak" ]; then
+    cp "$ITERM_DEST" "$ITERM_DEST.bak"
+    info "backup $ITERM_DEST -> $ITERM_DEST.bak"
+  fi
+  info "Installing iTerm2 preferences -> $ITERM_DEST"
+  cp "$ITERM_PLIST" "$ITERM_DEST"
+  defaults read com.googlecode.iterm2 >/dev/null 2>&1 || true  # nudge cfprefsd to reload
+fi
+
 # ── Install skills globally (~/.claude/skills) ──
 # Symlink each skills/<name>/ so edits in the repo take effect immediately. An
 # existing real (non-symlink) skill dir of the same name is backed up first.

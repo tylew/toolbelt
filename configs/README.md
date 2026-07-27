@@ -9,6 +9,26 @@ These are **fragments**, sourced from your real dotfiles — not replacements fo
 - `toolbelt-env.zsh` — sourced from `~/.zshenv` (every shell); loads secrets from the Keychain.
 - `toolbelt.zsh` — sourced from `~/.zshrc` (interactive); paths, history, aliases, tool init, plugins.
 - `functions/` — shell functions; every `*.zsh` here is sourced by `toolbelt.zsh`.
+- `iterm2/` — iTerm2 preferences (`com.googlecode.iterm2.plist`). See below.
+
+## iTerm2
+
+The `iterm2/` folder holds the exported preferences plist. `install.sh` copies
+it into the standard location (`~/Library/Preferences/com.googlecode.iterm2.plist`),
+backing up any existing prefs to `.bak` once. iTerm2 reads it on next launch.
+On a fresh machine, `brew bundle` installs the `iterm2` cask and this drops your
+config into place.
+
+This is **one-way** (repo → machine). To capture changes you make in iTerm2's
+GUI, re-export back into the repo (quit iTerm2 first so its in-memory prefs are
+flushed):
+
+```sh
+plutil -convert xml1 -o configs/iterm2/com.googlecode.iterm2.plist \
+  ~/Library/Preferences/com.googlecode.iterm2.plist
+```
+
+(Stored as XML so `git diff` is readable.)
 
 ## Dependencies
 

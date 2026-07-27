@@ -9,6 +9,27 @@ These are **fragments**, sourced from your real dotfiles — not replacements fo
 - `toolbelt-env.zsh` — sourced from `~/.zshenv` (every shell); loads secrets from the Keychain.
 - `toolbelt.zsh` — sourced from `~/.zshrc` (interactive); paths, history, aliases, tool init, plugins.
 - `functions/` — shell functions; every `*.zsh` here is sourced by `toolbelt.zsh`.
+- `iterm2/` — iTerm2 preferences (`com.googlecode.iterm2.plist`). See below.
+- `tmux.conf` — tmux config; `install.sh --tmux` symlinks it to `~/.config/tmux/tmux.conf`, so repo edits apply on the next reload (`prefix + r`).
+
+## iTerm2
+
+The `iterm2/` folder holds the exported preferences plist. `install.sh` copies
+it into the standard location (`~/Library/Preferences/com.googlecode.iterm2.plist`),
+backing up any existing prefs to `.bak` once. iTerm2 reads it on next launch.
+On a fresh machine, `brew bundle` installs the `iterm2` cask and this drops your
+config into place.
+
+This is **one-way** (repo → machine). To capture changes you make in iTerm2's
+GUI, re-export back into the repo (quit iTerm2 first so its in-memory prefs are
+flushed):
+
+```sh
+plutil -convert xml1 -o configs/iterm2/com.googlecode.iterm2.plist \
+  ~/Library/Preferences/com.googlecode.iterm2.plist
+```
+
+(Stored as XML so `git diff` is readable.)
 
 ## Dependencies
 
@@ -37,6 +58,18 @@ defines stays, and the toolbelt is sourced *after* it (so it overlays without
 erasing anything). The block sources these files straight from the repo, so
 edits here take effect immediately. Re-running is idempotent. To uninstall,
 delete the lines between the `# >>> tylew/toolbelt >>>` / `# <<< tylew/toolbelt <<<` markers.
+
+With no arguments it installs everything. To install only some parts, pass
+component flags (`./install.sh --help` for the full list):
+
+```sh
+../install.sh --iterm         # just the iTerm2 config
+../install.sh --shell --deps  # shell config + Homebrew deps
+```
+
+Components: `--deps` (Homebrew + Brewfile), `--shell` (zsh hooks), `--iterm`
+(iTerm2 prefs), `--tmux` (tmux.conf), `--skills` (`~/.claude/skills` symlinks),
+`--all` (default).
 
 ## Secrets
 

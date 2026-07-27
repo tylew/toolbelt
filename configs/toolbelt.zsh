@@ -43,22 +43,23 @@ unset _fn
 [[ -n "$SSH_CONNECTION" && "$PWD" == "$HOME" ]] && builtin cd ~/Documents
 
 # ── Tool init ──
-eval "$(starship init zsh)"
-eval "$(fzf --zsh)"
-eval "$(zoxide init zsh)"
-command -v fnm >/dev/null 2>&1 && eval "$(fnm env --use-on-cd --shell zsh)"  # Node version manager
-
-# fzf: back it with fd (fast, gitignore-aware, includes hidden) and add previews
-# — Ctrl-T shows file contents (bat), Alt-C shows a dir tree (eza). Guarded on
-# fd so a machine without it falls back to fzf's built-in walker instead of
-# breaking with "fd: command not found".
+# Let fd feed fzf (respects .gitignore, includes dotfiles, skips .git) and add
+# previews — Ctrl-T shows file contents (bat), Alt-C shows a dir tree (eza).
+# Guarded on fd so a machine without it falls back to fzf's built-in walker.
 if command -v fd >/dev/null 2>&1; then
-  export FZF_DEFAULT_COMMAND='fd --hidden --strip-cwd-prefix --exclude .git'
+  export FZF_DEFAULT_COMMAND='fd --type f --hidden --strip-cwd-prefix --exclude .git'
   export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
   export FZF_CTRL_T_OPTS="--preview 'bat --color=always --line-range :500 {}'"
   export FZF_ALT_C_COMMAND='fd --type d --hidden --strip-cwd-prefix --exclude .git'
   export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always --level=2 {}'"
 fi
+
+eval "$(starship init zsh)"
+eval "$(fzf --zsh)"
+eval "$(zoxide init zsh)"
+command -v fnm >/dev/null 2>&1 && eval "$(fnm env --use-on-cd --shell zsh)"  # Node version manager
+# atuin last of the history tools so it owns Ctrl-R and Up (over fzf's binding).
+command -v atuin >/dev/null 2>&1 && eval "$(atuin init zsh)"
 
 # ── Plugins (must be last) ──
 # Resolve Homebrew's prefix instead of hardcoding it — it's /opt/homebrew on a

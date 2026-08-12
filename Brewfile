@@ -12,6 +12,7 @@ brew "fzf"                    # fuzzy finder
 brew "starship"               # prompt
 brew "atuin"                  # sqlite-backed shell history + fuzzy search
 brew "tmux"                   # terminal multiplexer (config in configs/tmux.conf)
+brew "herdr"                  # agent multiplexer for AI coding agents (herdr.dev; Claude skill in skills/herdr)
 brew "zsh-autosuggestions"    # fish-like autosuggestions
 brew "zsh-syntax-highlighting" # command syntax highlighting
 

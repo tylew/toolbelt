@@ -19,3 +19,4 @@ git clone https://github.com/tylew/toolbelt && cd toolbelt && ./install.sh
 - [`configs/`](./configs) — Personal shell config (zsh). Assumes Homebrew on macOS.
 - [`references/`](./references) — Condensed how-to notes.
   - [`macos-keychain-secrets.md`](./references/macos-keychain-secrets.md) — Store API keys/tokens in the macOS Keychain and load them into your shell.
+  - [`hermes-mcp.md`](./references/hermes-mcp.md) — Expose your Hermes install as an MCP server (`hermes mcp serve`) and wire it into an MCP client.

@@ -59,3 +59,49 @@ Host claw
 - The `Host 100.*` wildcard is broad: it tunnels *every* `100.x` SSH through the
   container. If you also have devices on your Mac's own tailnet in that range that you
   want to reach directly, scope this to explicit IPs instead of the wildcard.
+
+## Serving host services on a path (`TS_SERVE_CONFIG`)
+
+Instead of forwarding *everything* to one host (`TS_DEST_IP`), the node can reverse-proxy
+individual paths to different host ports. Point `TS_SERVE_CONFIG` at a file under `./serve`
+(mounted read-only at `/config`):
+
+```sh
+TS_SERVE_CONFIG=/config/explorer.json
+```
+
+`serve/explorer.json` is a worked example — `/x` and `/r` both to `host.docker.internal:8770`.
+Write the node's own name as the `${TS_CERT_DOMAIN}` placeholder, which the image substitutes at
+startup, so the file stays portable between machines.
+
+**Use this rather than running `tailscale serve` by hand.** A hand-run config can be dropped when
+the container restarts, silently reducing the routes to a bare `/` proxy; a file-backed config is
+re-applied on every start.
+
+> **`TS_DEST_IP` and `TS_SERVE_CONFIG` are mutually exclusive.** `TS_DEST_IP` installs a blanket
+> DNAT on the node's tailnet address, which swallows traffic before `serve` ever sees it. Set one
+> or the other, never both. Both are unset by default.
+
+## Reaching the node from the Docker host (`TS_BRIDGE_PORTS`)
+
+`tailscale serve` binds the node's **tailnet address only**. That is fine for other tailnet
+devices, but the Docker host itself is often on a *different* tailnet and reaches the container by
+its docker-bridge IP — typically via an `/etc/hosts` line:
+
+```
+192.168.155.2  my-node.tailXXXX.ts.net
+```
+
+Nothing listens on that address, so the request fails with a **connection error, not a 404**. Set
+`TS_BRIDGE_PORTS` to forward the port from the bridge interface to the tailnet address:
+
+```sh
+TS_BRIDGE_PORTS=80        # or "80,443"
+```
+
+`entrypoint.sh` installs one idempotent DNAT rule per port once tailscaled has an address, and logs
+each one (`docker logs tailscale | grep bridge-forward`). Leave it unset and the wrapper is a no-op
+passthrough — the container behaves exactly like the stock image.
+
+Diagnosing: a connection error means the bridge rule is missing; a `404` means the request reached
+the node but no serve route matched.

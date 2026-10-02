@@ -30,7 +30,9 @@ install only those parts:
   --shell     hook the zsh config into ~/.zshrc and ~/.zshenv
   --iterm     copy iTerm2 preferences into ~/Library/Preferences
   --tmux      symlink tmux.conf into ~/.config/tmux
+  --yazi      symlink yazi configs into ~/.config/yazi
   --skills    symlink skills into ~/.claude/skills
+  --bin       symlink bin/ scripts into ~/.local/bin
   --all       everything (the default)
   -h, --help  show this help
 
@@ -42,9 +44,9 @@ EOF
 }
 
 # ── Parse args: enable selected components (default = all) ──
-do_deps=false do_shell=false do_iterm=false do_tmux=false do_skills=false
+do_deps=false do_shell=false do_iterm=false do_tmux=false do_yazi=false do_skills=false do_bin=false
 if [ "$#" -eq 0 ]; then
-  do_deps=true do_shell=true do_iterm=true do_tmux=true do_skills=true
+  do_deps=true do_shell=true do_iterm=true do_tmux=true do_yazi=true do_skills=true do_bin=true
 else
   for arg in "$@"; do
     case "$arg" in
@@ -52,8 +54,10 @@ else
       --shell)  do_shell=true ;;
       --iterm)  do_iterm=true ;;
       --tmux)   do_tmux=true ;;
+      --yazi)   do_yazi=true ;;
       --skills) do_skills=true ;;
-      --all)    do_deps=true do_shell=true do_iterm=true do_tmux=true do_skills=true ;;
+      --bin)    do_bin=true ;;
+      --all)    do_deps=true do_shell=true do_iterm=true do_tmux=true do_yazi=true do_skills=true do_bin=true ;;
       -h|--help) usage; exit 0 ;;
       *) printf 'Unknown option: %s\n\n' "$arg" >&2; usage >&2; exit 2 ;;
     esac
@@ -142,6 +146,30 @@ install_tmux() {
   info "tmux.conf -> $dest"
 }
 
+# ── yazi: symlink each config file into ~/.config/yazi ──
+# Per-file (not whole-dir) so machine-local files (e.g. theme.toml) can coexist.
+# An existing real file is backed up to .bak once.
+install_yazi() {
+  local srcdir="$CONFIGS/yazi"
+  [ -d "$srcdir" ] || { info "skip  no yazi configs in repo"; return; }
+  mkdir -p "$HOME/.config/yazi"
+  local src dest
+  for src in "$srcdir"/*.toml; do
+    [ -f "$src" ] || continue
+    dest="$HOME/.config/yazi/$(basename "$src")"
+    if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$src" ]; then
+      info "ok    yazi/$(basename "$src") already linked"
+      continue
+    fi
+    if [ -e "$dest" ] || [ -L "$dest" ]; then
+      mv "$dest" "$dest.bak"
+      info "backup $dest -> $dest.bak"
+    fi
+    ln -s "$src" "$dest"
+    info "yazi/$(basename "$src") -> $dest"
+  done
+}
+
 # ── Skills: symlink each skills/<name>/ into ~/.claude/skills ──
 # Edits in the repo then take effect immediately. An existing real (non-symlink)
 # skill dir of the same name is backed up first.
@@ -166,10 +194,36 @@ install_skills() {
   done
 }
 
+# ── bin: symlink each executable in bin/ into ~/.local/bin ──
+# ~/.local/bin is put on PATH by configs/toolbelt.zsh. Symlinked (not copied) so
+# repo edits take effect immediately. An existing real file is backed up once.
+install_bin() {
+  [ -d "$REPO/bin" ] || { info "skip  no bin/ in repo"; return; }
+  local dir="$HOME/.local/bin"
+  mkdir -p "$dir"
+  local src dest
+  for src in "$REPO/bin"/*; do
+    [ -f "$src" ] && [ -x "$src" ] || continue
+    dest="$dir/$(basename "$src")"
+    if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$src" ]; then
+      info "ok    bin/$(basename "$src") already linked"
+      continue
+    fi
+    if [ -e "$dest" ] || [ -L "$dest" ]; then
+      mv "$dest" "$dest.bak"
+      info "backup $dest -> $dest.bak"
+    fi
+    ln -s "$src" "$dest"
+    info "bin/$(basename "$src") -> $dest"
+  done
+}
+
 $do_deps   && install_deps
 $do_shell  && install_shell
 $do_iterm  && install_iterm
 $do_tmux   && install_tmux
+$do_yazi   && install_yazi
 $do_skills && install_skills
+$do_bin    && install_bin
 
 info "Done. Open a new shell (or run: exec zsh)."

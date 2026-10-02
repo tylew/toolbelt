@@ -1,0 +1,248 @@
+#!/usr/bin/env bash
+# tsvnc — Screen Sharing to a machine on the PERSONAL tailnet, from a Mac whose
+# own tailscale node is on a DIFFERENT (work) tailnet.
+#
+# Why this exists: the personal tailnet is only reachable through the toolbelt
+# tailscale container, which exposes a SOCKS5 proxy on 127.0.0.1:1055. SSH can
+# use that proxy via ProxyCommand, but VNC/Screen Sharing has no SOCKS support
+# and ignores ~/.ssh/config entirely. So we tunnel the remote 5900 over an SSH
+# session that *does* go through the proxy, then point Screen Sharing at the
+# local end of that tunnel.
+#
+#   tsvnc studio            connect (resolves the name on the personal tailnet)
+#   tsvnc 100.74.17.70      connect by tailnet IP
+#   tsvnc -u admin studio   connect as a specific remote user
+#   tsvnc list              online peers on the personal tailnet
+#   tsvnc status            active tunnels
+#   tsvnc stop studio       tear one down   (stop --all for everything)
+set -euo pipefail
+
+SOCKS="${TSVNC_SOCKS:-127.0.0.1:1055}"
+CONTAINER="${TSVNC_CONTAINER:-tailscale}"
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/tsvnc"
+REMOTE_PORT=5900
+LOCAL_PORT_BASE=5901
+
+die()  { printf '\033[1;31mtsvnc:\033[0m %s\n' "$*" >&2; exit 1; }
+info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33mtsvnc:\033[0m %s\n' "$*" >&2; }
+
+usage() {
+  cat <<'EOF'
+tsvnc — VNC to the personal tailnet through the tailscale container's SOCKS proxy
+
+Usage:
+  tsvnc [-u USER] [-p PORT] <host|ip>   open Screen Sharing over an SSH tunnel
+  tsvnc list                            online peers on the personal tailnet
+  tsvnc status                          active tunnels
+  tsvnc stop <host|ip> | --all          tear down tunnel(s)
+
+Options:
+  -u, --user USER   remote username (default: ~/.ssh/config, $TSVNC_USER, $USER)
+  -i, --identity F  ssh private key to use
+  -p, --port PORT   local port to bind (default: first free from 5901)
+  -n, --no-open     set up the tunnel but don't launch Screen Sharing
+  -h, --help        this text
+
+Env:
+  TSVNC_SOCKS       SOCKS5 proxy address   (default 127.0.0.1:1055)
+  TSVNC_CONTAINER   docker container name  (default tailscale)
+  TSVNC_USER        default remote username
+EOF
+}
+
+# ── The container is the only route to the personal tailnet ──
+require_proxy() {
+  docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -q true \
+    || die "container '$CONTAINER' is not running (start it: docker compose -f \$TOOLBELT_DIR/tailscale-proxy/docker-compose.yml up -d)"
+  local self
+  self=$(ts_json | python3 -c 'import json,sys; print(json.load(sys.stdin)["Self"].get("Online"))' 2>/dev/null || echo)
+  [ "$self" = "True" ] || die "container's tailscale node is offline — re-auth it: docker exec $CONTAINER tailscale up --force-reauth"
+}
+
+ts_json() { docker exec "$CONTAINER" tailscale status --json 2>/dev/null; }
+
+# Resolve a peer name (or bare IP) to a tailnet IPv4, and report whether it's up.
+# Prints "<ip> <online> <hostname>".
+resolve() {
+  local q="$1"
+  ts_json | python3 -c '
+import json,sys
+q=sys.argv[1].lower()
+d=json.load(sys.stdin)
+peers=list(d["Peer"].values())+[d["Self"]]
+def v4(p): return next((i for i in p["TailscaleIPs"] if ":" not in i), None)
+def hit(p):
+    print(v4(p), p.get("Online"), p["HostName"]); sys.exit(0)
+for p in peers:                                   # exact IP
+    if q == v4(p): hit(p)
+for p in peers:                                   # exact name (or MagicDNS label)
+    if q in (p["HostName"].lower(), p.get("DNSName","").split(".")[0].lower()): hit(p)
+m=[p for p in peers if p["HostName"].lower().startswith(q)]   # unique prefix
+if len(m)==1: hit(m[0])
+if not m: m=[p for p in peers if q in p["HostName"].lower()]   # substring
+if len(m)==1: hit(m[0])
+if len(m)>1: sys.exit("ambiguous, be more specific: "+", ".join(repr(p["HostName"]) for p in m))
+sys.exit("no such peer: "+sys.argv[1])
+' "$q"
+}
+
+# TCP reachability through the SOCKS proxy — proves the port is open end-to-end
+# before we hand anything to Screen Sharing (which fails opaquely).
+probe() {
+  python3 -c '
+import socket,struct,sys
+host,port=sys.argv[1].split(":"); ip,rport=sys.argv[2],int(sys.argv[3])
+try:
+    s=socket.create_connection((host,int(port)),timeout=6); s.settimeout(6)
+    s.sendall(b"\x05\x01\x00")
+    if s.recv(2)[1]!=0: sys.exit("SOCKS rejected no-auth")
+    s.sendall(b"\x05\x01\x00\x01"+socket.inet_aton(ip)+struct.pack(">H",rport))
+    r=s.recv(10); s.close()
+    codes={1:"general failure",2:"not allowed",3:"network unreachable",
+           4:"host unreachable",5:"connection refused",6:"TTL expired"}
+    if r[1]!=0: sys.exit(codes.get(r[1],"code %d"%r[1]))
+except OSError as e: sys.exit(str(e))
+' "$SOCKS" "$1" "$2"
+}
+
+free_port() {
+  local p=$LOCAL_PORT_BASE
+  while lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1; do p=$((p+1)); done
+  echo "$p"
+}
+
+sock_path() { echo "$STATE/$1.sock"; }
+alive()     { [ -S "$(sock_path "$1")" ] && ssh -S "$(sock_path "$1")" -O check placeholder >/dev/null 2>&1; }
+
+cmd_list() {
+  require_proxy
+  ts_json | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+rows=[(p["HostName"],next((i for i in p["TailscaleIPs"] if ":" not in i),"?"),p.get("OS",""),p.get("Online"))
+      for p in d["Peer"].values()]
+rows.sort(key=lambda r:(not r[3], r[0].lower()))
+print("%-24s %-16s %-7s %s" % ("HOST","TAILNET IP","OS","STATE"))
+for h,ip,os_,on in rows:
+    print("%-24s %-16s %-7s %s" % (h[:23], ip, os_[:6], "online" if on else "offline"))
+'
+}
+
+cmd_status() {
+  local found=0
+  shopt -s nullglob
+  for s in "$STATE"/*.sock; do
+    local name port
+    name=$(basename "$s" .sock)
+    port=$(cat "$STATE/$name.port" 2>/dev/null || echo "?")
+    if alive "$name"; then
+      printf '  %-24s vnc://127.0.0.1:%s\n' "$name" "$port"
+      found=1
+    else
+      rm -f "$s" "$STATE/$name.port"   # stale socket from a dead session
+    fi
+  done
+  [ "$found" = 1 ] || echo "no active tunnels"
+}
+
+cmd_stop() {
+  local target="${1:-}"
+  [ -n "$target" ] || die "stop: need a host, or --all"
+  shopt -s nullglob
+  if [ "$target" = "--all" ]; then
+    for s in "$STATE"/*.sock; do cmd_stop "$(basename "$s" .sock)"; done
+    return
+  fi
+  local name="$target"
+  # Allow stopping by the name the user connected with, or by resolved IP.
+  [ -S "$(sock_path "$name")" ] || name=$(resolve "$target" | awk '{print $1}') || true
+  if alive "$name"; then
+    ssh -S "$(sock_path "$name")" -O exit placeholder >/dev/null 2>&1 || true
+    info "closed tunnel to $name"
+  else
+    warn "no active tunnel for $target"
+  fi
+  rm -f "$(sock_path "$name")" "$STATE/$name.port"
+}
+
+cmd_connect() {
+  local target="$1" user="${2:-}" want_port="${3:-}" do_open="${4:-1}" key="${5:-}"
+  require_proxy
+  mkdir -p "$STATE"
+
+  local ip online host
+  read -r ip online host < <(resolve "$target")
+  [ -n "$ip" ] || die "could not resolve '$target'"
+  [ "$online" = "True" ] || die "'$host' ($ip) is offline on the tailnet"
+
+  # Reuse an existing tunnel rather than stacking a second one on a new port.
+  if alive "$ip"; then
+    local port; port=$(cat "$STATE/$ip.port")
+    info "reusing tunnel to $host -> 127.0.0.1:$port"
+    [ "$do_open" = 1 ] && open "vnc://127.0.0.1:$port" || true
+    return
+  fi
+
+  info "$host ($ip) is online — checking Screen Sharing port"
+  if ! err=$(probe "$ip" "$REMOTE_PORT" 2>&1); then
+    die "port $REMOTE_PORT on $host unreachable: $err
+     Screen Sharing may be off (System Settings > General > Sharing)."
+  fi
+
+  local port; port="${want_port:-$(free_port)}"
+  # Username precedence: -u > whatever ~/.ssh/config sets for this host >
+  # $TSVNC_USER > $USER. `ssh -G` resolves the config for us, but always yields
+  # *something*, so a result equal to $USER means nothing was configured.
+  if [ -z "$user" ]; then
+    local cfg_user
+    cfg_user=$(ssh -G "$ip" 2>/dev/null | awk '/^user /{print $2; exit}')
+    if [ -n "$cfg_user" ] && [ "$cfg_user" != "$USER" ]; then
+      user="$cfg_user"
+    else
+      user="${TSVNC_USER:-$USER}"
+    fi
+  fi
+
+  info "tunnelling $user@$host:$REMOTE_PORT -> 127.0.0.1:$port"
+  # -f backgrounds only after the forward is established, so a failure here is
+  # caught now rather than surfacing later as a broken Screen Sharing window.
+  local id=()
+  [ -n "$key" ] && id=(-i "$key" -o IdentitiesOnly=yes)
+  ssh -f -N -M -S "$(sock_path "$ip")" \
+      ${id+"${id[@]}"} \
+      -o ExitOnForwardFailure=yes \
+      -o ServerAliveInterval=60 -o ServerAliveCountMax=10 \
+      -o ProxyCommand="nc -X 5 -x $SOCKS %h %p" \
+      -L "$port:localhost:$REMOTE_PORT" \
+      "$user@$ip" \
+    || die "ssh tunnel failed (wrong user? try: tsvnc -u <name> $target)"
+
+  echo "$port" > "$STATE/$ip.port"
+  info "tunnel up — vnc://127.0.0.1:$port   (close it: tsvnc stop $target)"
+  [ "$do_open" = 1 ] && open "vnc://127.0.0.1:$port" || true
+}
+
+# ── Arg parsing ──
+USER_OPT="" PORT_OPT="" KEY_OPT="" OPEN=1 POSITIONAL=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -u|--user)    USER_OPT="${2:-}"; shift 2 ;;
+    -p|--port)    PORT_OPT="${2:-}"; shift 2 ;;
+    -i|--identity) KEY_OPT="${2:-}"; shift 2 ;;
+    -n|--no-open) OPEN=0; shift ;;
+    -h|--help)    usage; exit 0 ;;
+    --all)        POSITIONAL+=("--all"); shift ;;
+    -*)           die "unknown option: $1" ;;
+    *)            POSITIONAL+=("$1"); shift ;;
+  esac
+done
+set -- ${POSITIONAL+"${POSITIONAL[@]}"}
+
+case "${1:-}" in
+  "")       usage; exit 2 ;;
+  list)     cmd_list ;;
+  status)   cmd_status ;;
+  stop)     shift; cmd_stop "${1:-}" ;;
+  *)        cmd_connect "$1" "$USER_OPT" "$PORT_OPT" "$OPEN" "$KEY_OPT" ;;
+esac

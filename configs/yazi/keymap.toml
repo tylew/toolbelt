@@ -1,0 +1,6 @@
+# prepend_keymap takes priority over Yazi's built-in bindings,
+# so this overrides the default `o` (open with picker).
+[[mgr.prepend_keymap]]
+on = "o"
+run = 'shell -- code "$@"'
+desc = "Open in VS Code"

@@ -1,0 +1,4 @@
+# Two-column layout: hide the parent-directory pane, split the remaining
+# width evenly between the current listing and the preview.
+[mgr]
+ratio = [0, 1, 1]

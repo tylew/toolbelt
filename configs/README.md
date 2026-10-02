@@ -11,6 +11,7 @@ These are **fragments**, sourced from your real dotfiles — not replacements fo
 - `functions/` — shell functions; every `*.zsh` here is sourced by `toolbelt.zsh`.
 - `iterm2/` — iTerm2 preferences (`com.googlecode.iterm2.plist`). See below.
 - `tmux.conf` — tmux config; `install.sh --tmux` symlinks it to `~/.config/tmux/tmux.conf`, so repo edits apply on the next reload (`prefix + r`).
+- `yazi/` — yazi config; `install.sh --yazi` symlinks each file into `~/.config/yazi/` (per-file, so machine-local files like `theme.toml` can coexist). `yazi.toml` hides the parent-directory pane (two-column layout); `keymap.toml` binds `o` to open the selection in VS Code. Loaded on yazi startup — restart open sessions to pick up edits.
 
 ## iTerm2
 
@@ -68,8 +69,8 @@ component flags (`./install.sh --help` for the full list):
 ```
 
 Components: `--deps` (Homebrew + Brewfile), `--shell` (zsh hooks), `--iterm`
-(iTerm2 prefs), `--tmux` (tmux.conf), `--skills` (`~/.claude/skills` symlinks),
-`--all` (default).
+(iTerm2 prefs), `--tmux` (tmux.conf), `--yazi` (yazi configs), `--skills`
+(`~/.claude/skills` symlinks), `--all` (default).
 
 ## Secrets
 

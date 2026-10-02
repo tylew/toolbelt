@@ -1,0 +1,22 @@
+{
+  "TCP": {
+    "80": {
+      "HTTP": true
+    }
+  },
+  "Web": {
+    "${TS_CERT_DOMAIN}:80": {
+      "Handlers": {
+        "/": {
+          "Proxy": "http://host.docker.internal:8770"
+        },
+        "/x": {
+          "Proxy": "http://host.docker.internal:8770"
+        },
+        "/r": {
+          "Proxy": "http://host.docker.internal:8770"
+        }
+      }
+    }
+  }
+}

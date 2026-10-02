@@ -12,15 +12,32 @@ services:
       - SYS_MODULE
     devices:
       - /dev/net/tun:/dev/net/tun
+    # Thin wrapper around the stock entrypoint; a no-op unless TS_BRIDGE_PORTS is set.
+    entrypoint: ["/entrypoint.sh"]
     volumes:
       - tailscale-state:/var/lib/tailscale
       - /dev/net/tun:/dev/net/tun
+      - ./entrypoint.sh:/entrypoint.sh:ro
+      - ./serve:/config:ro
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY}
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=false
       - TS_ACCEPT_DNS=true
-      - TS_DEST_IP=0.250.250.254
+      # Forward-everything-to-one-host mode (the tool's original purpose). Unset by
+      # default because it installs a blanket DNAT on this node's tailnet address and
+      # is MUTUALLY EXCLUSIVE with serve: the DNAT swallows traffic before serve sees
+      # it. Set it to a real destination IP only if you want that mode.
+      - TS_DEST_IP=${TS_DEST_IP:-}
+      # Per-path reverse proxy, persisted across restarts (unlike `tailscale serve`
+      # run by hand, which a restart can drop). Point at a file under ./serve, which
+      # is mounted at /config; write the node's own name as the TS_CERT_DOMAIN
+      # placeholder so the file stays portable between machines.
+      - TS_SERVE_CONFIG=${TS_SERVE_CONFIG:-}
+      # Comma-separated TCP ports to forward from the docker-bridge interface to this
+      # node's tailnet address (see entrypoint.sh). Needed only when the host reaches
+      # this container by bridge IP instead of over the tailnet.
+      - TS_BRIDGE_PORTS=${TS_BRIDGE_PORTS:-}
       # Expose a SOCKS5 + HTTP CONNECT proxy so the host can dial tailnet devices through this node.
       - TS_TAILSCALED_EXTRA_ARGS=--socks5-server=0.0.0.0:1055 --outbound-http-proxy-listen=0.0.0.0:1055
     sysctls:

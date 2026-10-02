@@ -8,7 +8,12 @@ These are **fragments**, sourced from your real dotfiles — not replacements fo
 
 - `toolbelt-env.zsh` — sourced from `~/.zshenv` (every shell); loads secrets from the Keychain.
 - `toolbelt.zsh` — sourced from `~/.zshrc` (interactive); paths, history, aliases, tool init, plugins.
-- `functions/` — shell functions; every `*.zsh` here is sourced by `toolbelt.zsh`.
+- `functions/` — shell functions; every `*.zsh` here is sourced by `toolbelt.zsh`:
+  - `c.zsh` — `c`: launch Claude Code wrapped in `caffeinate` so the Mac stays awake.
+  - `fs.zsh` — `fs`: open yazi and cd into the directory you quit from.
+  - `secrets.zsh` — `store-secret` / `get-secret` / `delete-secret` / `list-secrets` (see Secrets below).
+  - `tb.zsh` — `tb update` (pull + brew bundle) and `tb edit` (cd into the repo).
+- `secrets.example` — example of the per-machine secrets manifest (see Secrets below).
 - `iterm2/` — iTerm2 preferences (`com.googlecode.iterm2.plist`). See below.
 - `tmux.conf` — tmux config; `install.sh --tmux` symlinks it to `~/.config/tmux/tmux.conf`, so repo edits apply on the next reload (`prefix + r`).
 - `yazi/` — yazi config; `install.sh --yazi` symlinks each file into `~/.config/yazi/` (per-file, so machine-local files like `theme.toml` can coexist). `yazi.toml` hides the parent-directory pane (two-column layout); `keymap.toml` binds `o` to open the selection in VS Code. Loaded on yazi startup — restart open sessions to pick up edits.
@@ -68,9 +73,8 @@ component flags (`./install.sh --help` for the full list):
 ../install.sh --shell --deps  # shell config + Homebrew deps
 ```
 
-Components: `--deps` (Homebrew + Brewfile), `--shell` (zsh hooks), `--iterm`
-(iTerm2 prefs), `--tmux` (tmux.conf), `--yazi` (yazi configs), `--skills`
-(`~/.claude/skills` symlinks), `--all` (default).
+The full flag list, and what each component installs, is in the
+[top-level README](../README.md#parameter-reference).
 
 ## Secrets
 
